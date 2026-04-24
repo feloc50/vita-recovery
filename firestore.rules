@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/adminUsers/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Allow admins to list all userProfiles
+    match /userProfiles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /professionals/{professionalId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == resource.data.userId;
+      allow delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /professionalServices/{professionalServiceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()|| isAdmin();
+      allow update: if isAdmin() || request.auth.uid == resource.data.userId;
+      allow delete: if isAdmin() || request.auth.uid == resource.data.userId;
+    }
+    
+    match /locations/{locationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()|| isAdmin();
+      allow update: if isAdmin() || request.auth.uid == resource.data.userId;
+      allow delete: if isAdmin() || request.auth.uid == resource.data.userId;
+    }
+
+    match /professionalAvailability/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && ( isAdmin() || exists(/databases/$(database)/documents/professionals/$(request.resource.data.professionalId)) && get(/databases/$(database)/documents/professionals/$(request.resource.data.professionalId)).data.userId == request.auth.uid);
+    }
+
+    // Coupon Books rules
+    match /couponBooks/{couponBookId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.uid == resource.data.clientId
+      );
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
